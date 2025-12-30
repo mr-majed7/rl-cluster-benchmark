@@ -81,8 +81,8 @@ def worker_process(
 
     while not stop_event.is_set():
         try:
-            # Wait for signal to collect
-            command = control_queue.get(timeout=1.0)
+            # Wait for signal to collect (longer timeout for initialization)
+            command = control_queue.get(timeout=30.0)
 
             if command == "collect":
                 # Policy is already shared, no need to sync
