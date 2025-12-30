@@ -1,0 +1,43 @@
+# PPO Sequential Training Configuration
+
+# Environment settings
+env:
+  name: "procgen:procgen-coinrun-v0"  # Procgen environment name
+  num_envs: 64  # Number of parallel environments
+  seed: 42  # Random seed (null for random)
+
+# Training hyperparameters
+training:
+  total_timesteps: 25000000  # Total training timesteps
+  n_steps: 256  # Steps per rollout
+  batch_size: 2048  # Batch size for training
+  n_epochs: 3  # Number of epochs per update
+  
+# PPO hyperparameters
+ppo:
+  learning_rate: 0.0005  # Learning rate (5e-4)
+  gamma: 0.999  # Discount factor
+  gae_lambda: 0.95  # GAE lambda
+  clip_range: 0.2  # PPO clipping parameter
+  clip_range_vf: null  # Value function clipping (null for no clipping)
+  normalize_advantage: true  # Normalize advantages
+  ent_coef: 0.01  # Entropy coefficient
+  vf_coef: 0.5  # Value function coefficient
+  max_grad_norm: 0.5  # Maximum gradient norm
+
+# Model architecture
+model:
+  hidden_size: 512  # Hidden layer size
+
+# Logging and checkpointing
+logging:
+  log_interval: 1  # Log every N updates
+  save_interval: 100  # Save checkpoint every N updates
+  eval_episodes: 10  # Number of episodes for evaluation
+  checkpoint_dir: "./checkpoints/ppo_sequential"
+  log_dir: "./logs"
+
+# Hardware
+hardware:
+  device: "cuda"  # cuda or cpu
+
