@@ -3,8 +3,6 @@
 import argparse
 import os
 
-import torch
-
 from src.config import load_config, save_config
 from src.trainer import SequentialTrainer
 
@@ -50,7 +48,14 @@ def parse_args():
 
     # Hardware
     parser.add_argument(
-        "--device", type=str, choices=["cuda", "cpu"], help="Device to use"
+        "--device",
+        type=str,
+        choices=["cuda", "cpu"],
+        default="cpu",
+        help="Device to use (default: cpu)",
+    )
+    parser.add_argument(
+        "--num-threads", type=int, help="Number of CPU threads (default: auto-detect)"
     )
 
     return parser.parse_args()
@@ -109,6 +114,8 @@ def main():
 
     if args.device:
         config.setdefault("hardware", {})["device"] = args.device
+    if args.num_threads:
+        config.setdefault("hardware", {})["num_threads"] = args.num_threads
 
     # Extract parameters
     env_config = config.get("env", {})
@@ -133,14 +140,16 @@ def main():
     print(f"Environment: {env_config.get('name', 'procgen:procgen-coinrun-v0')}")
     print(f"Number of environments: {env_config.get('num_envs', 64)}")
     print(f"Total timesteps: {training_config.get('total_timesteps', 25_000_000):,}")
-    print(
-        f"Device: {hardware_config.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')}"
-    )
+    print(f"Device: {hardware_config.get('device', 'cpu')}")
+    if hardware_config.get("num_threads"):
+        print(f"CPU Threads: {hardware_config.get('num_threads')}")
+    else:
+        print("CPU Threads: auto-detect")
     print("=" * 60 + "\n")
 
     # Initialize trainer
     trainer = SequentialTrainer(
-        env_name=env_config.get("name", "procgen:procgen-coinrun-v0"),
+        env_name=env_config.get("name", "procgen-coinrun-v0"),
         num_envs=env_config.get("num_envs", 64),
         n_steps=training_config.get("n_steps", 256),
         total_timesteps=training_config.get("total_timesteps", 25_000_000),
@@ -159,9 +168,8 @@ def main():
         checkpoint_dir=checkpoint_dir,
         log_dir=logging_config.get("log_dir", "./logs"),
         seed=env_config.get("seed"),
-        device=hardware_config.get(
-            "device", "cuda" if torch.cuda.is_available() else "cpu"
-        ),
+        device=hardware_config.get("device", "cpu"),
+        num_threads=hardware_config.get("num_threads"),
     )
 
     # Start training

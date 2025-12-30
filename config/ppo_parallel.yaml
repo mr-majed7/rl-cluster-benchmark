@@ -1,0 +1,59 @@
+# Parallel PPO Configuration for CPU Cluster
+# Optimized for distributed training across multiple CPU workers
+
+env:
+  name: "procgen-coinrun-v0"
+  seed: 42
+
+parallel:
+  # Number of worker processes (set to number of CPU cores / 2-4)
+  # For 16-core CPU: 4-8 workers is optimal
+  num_workers: 4
+  
+  # Environments per worker
+  # Total envs = num_workers * num_envs_per_worker
+  num_envs_per_worker: 8  # Total: 32 environments
+
+training:
+  # Steps per rollout per worker
+  n_steps: 128
+  
+  # Total timesteps (will be stopped by timer in timed training)
+  total_timesteps: 25000000
+  
+  # Batch size for PPO updates (larger for parallel)
+  batch_size: 2048  # 4 workers * 8 envs * 128 steps = 4096 samples
+  
+  # Epochs per update
+  n_epochs: 4
+
+ppo:
+  learning_rate: 0.0005  # 5e-4
+  gamma: 0.999
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+
+logging:
+  log_interval: 1  # Log every update
+  save_interval: 50  # Save every 50 updates
+
+hardware:
+  device: "cpu"
+  # Main process threads (None = auto-detect)
+  # Workers will also auto-detect their optimal thread count
+  num_threads: null
+
+# Performance Notes for CPU:
+# - num_workers: Should be <= number of physical cores
+# - num_envs_per_worker: 4-16 works well for Procgen
+# - batch_size: Should be >= n_steps * total_envs for best results
+# - Workers run in parallel, coordinator updates sequentially
+#
+# Expected Performance (16-core Ryzen 7 7700):
+# - 4 workers × 8 envs = 32 total environments
+# - FPS: 3000-5000 (2-3x faster than sequential)
+# - Memory: 4-8 GB (more than sequential due to multiple processes)
+

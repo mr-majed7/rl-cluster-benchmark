@@ -3,13 +3,22 @@
 import time
 from typing import Dict, Optional
 
-import gymnasium as gym
+import gym  # Old gym for procgen
+import gymnasium
 import numpy as np
 import torch
 from gymnasium.wrappers import RecordEpisodeStatistics
+from shimmy.openai_gym_compatibility import GymV21CompatibilityV0
 from tqdm import tqdm
 
+# Import procgen to register environments
+try:
+    import procgen  # noqa: F401
+except ImportError:
+    print("Warning: procgen not installed")
+
 from .buffer import RolloutBuffer
+from .cpu_utils import CPUMemoryMonitor, print_cpu_info
 from .ppo import PPO
 from .utils import Logger
 
@@ -19,7 +28,7 @@ class SequentialTrainer:
 
     def __init__(
         self,
-        env_name: str = "procgen:procgen-coinrun-v0",
+        env_name: str = "procgen-coinrun-v0",
         num_envs: int = 64,
         n_steps: int = 256,
         total_timesteps: int = 25_000_000,
@@ -38,7 +47,8 @@ class SequentialTrainer:
         checkpoint_dir: str = "./checkpoints",
         log_dir: str = "./logs",
         seed: Optional[int] = None,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        device: str = "cpu",
+        num_threads: Optional[int] = None,
     ):
         """Initialize the sequential trainer.
 
@@ -62,7 +72,8 @@ class SequentialTrainer:
             checkpoint_dir: Directory to save checkpoints
             log_dir: Directory to save logs
             seed: Random seed
-            device: Device to use
+            device: Device to use (default: cpu)
+            num_threads: Number of CPU threads (None = auto-detect)
         """
         self.env_name = env_name
         self.num_envs = num_envs
@@ -75,6 +86,7 @@ class SequentialTrainer:
         self.eval_episodes = eval_episodes
         self.checkpoint_dir = checkpoint_dir
         self.device = device
+        self.num_threads = num_threads
 
         # Set random seeds
         if seed is not None:
@@ -85,12 +97,17 @@ class SequentialTrainer:
 
         # Create environments
         print(f"Creating {num_envs} environments: {env_name}")
-        self.envs = gym.vector.SyncVectorEnv(
-            [
-                lambda: RecordEpisodeStatistics(gym.make(env_name))
-                for _ in range(num_envs)
-            ]
-        )
+
+        def make_env():
+            # Use old gym for procgen, then wrap for gymnasium compatibility
+            if "procgen" in env_name:
+                old_env = gym.make(env_name)
+                new_env = GymV21CompatibilityV0(env=old_env)
+            else:
+                new_env = gymnasium.make(env_name)
+            return RecordEpisodeStatistics(new_env)
+
+        self.envs = gymnasium.vector.SyncVectorEnv([make_env for _ in range(num_envs)])
 
         # Get observation shape and action space
         obs_shape = self.envs.single_observation_space.shape
@@ -118,6 +135,7 @@ class SequentialTrainer:
             vf_coef=vf_coef,
             max_grad_norm=max_grad_norm,
             device=device,
+            num_threads=num_threads,
         )
 
         # Initialize rollout buffer
@@ -134,6 +152,13 @@ class SequentialTrainer:
         # Training state
         self.global_step = 0
         self.update_step = 0
+
+        # CPU memory monitoring
+        self.memory_monitor = CPUMemoryMonitor() if device == "cpu" else None
+
+        # Print CPU info if using CPU
+        if device == "cpu":
+            print_cpu_info()
 
     def _preprocess_obs(self, obs: np.ndarray) -> np.ndarray:
         """Preprocess observations: normalize and transpose to (N, C, H, W)."""
@@ -153,7 +178,7 @@ class SequentialTrainer:
         obs, _ = self.envs.reset()
         obs = self._preprocess_obs(obs)
 
-        for step in range(self.n_steps):
+        for _ in range(self.n_steps):
             # Select action
             action, value, log_prob = self.agent.predict(obs)
 
@@ -209,7 +234,7 @@ class SequentialTrainer:
         num_updates = self.total_timesteps // (self.n_steps * self.num_envs)
         start_time = time.time()
 
-        for update in tqdm(range(num_updates), desc="Training"):
+        for _ in tqdm(range(num_updates), desc="Training"):
             update_start_time = time.time()
 
             # Collect rollouts
@@ -243,6 +268,13 @@ class SequentialTrainer:
                     "train/clip_fraction": train_stats["clip_fraction"],
                     "train/approx_kl": train_stats["approx_kl"],
                 }
+
+                # Add memory stats if using CPU
+                if self.memory_monitor:
+                    self.memory_monitor.update()
+                    mem_stats = self.memory_monitor.get_stats()
+                    log_data["system/memory_gb"] = mem_stats["current_memory_gb"]
+                    log_data["system/peak_memory_gb"] = mem_stats["peak_memory_gb"]
 
                 if rollout_stats:
                     log_data.update(

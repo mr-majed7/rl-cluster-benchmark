@@ -2,10 +2,18 @@
 """Evaluate a trained PPO agent on Procgen environments."""
 import argparse
 
-import gymnasium as gym
+import gym as old_gym
+import gymnasium
 import numpy as np
 import torch
+from shimmy.openai_gym_compatibility import GymV21CompatibilityV0
 from tqdm import tqdm
+
+# Import procgen to register environments
+try:
+    import procgen  # noqa: F401
+except ImportError:
+    print("Warning: procgen not installed")
 
 from src.ppo import PPO
 
@@ -18,7 +26,10 @@ def parse_args():
         "--checkpoint", type=str, required=True, help="Path to model checkpoint"
     )
     parser.add_argument(
-        "--env", type=str, default="procgen:procgen-coinrun-v0", help="Environment name"
+        "--env",
+        type=str,
+        default="procgen:procgen-coinrun-v0",
+        help="Environment name (use procgen:procgen-<game>-v0 format)",
     )
     parser.add_argument(
         "--num-episodes", type=int, default=100, help="Number of episodes to evaluate"
@@ -27,8 +38,8 @@ def parse_args():
     parser.add_argument(
         "--device",
         type=str,
-        default="cuda" if torch.cuda.is_available() else "cpu",
-        help="Device to use",
+        default="cpu",
+        help="Device to use (default: cpu)",
     )
     parser.add_argument("--render", action="store_true", help="Render the environment")
     parser.add_argument(
@@ -45,7 +56,7 @@ def preprocess_obs(obs: np.ndarray) -> np.ndarray:
     return np.expand_dims(obs, axis=0)  # Add batch dimension
 
 
-def evaluate(agent: PPO, env: gym.Env, num_episodes: int, deterministic: bool = False):
+def evaluate(agent: PPO, env, num_episodes: int, deterministic: bool = False):
     """Evaluate agent for multiple episodes.
 
     Args:
@@ -100,7 +111,11 @@ def main():
         torch.manual_seed(args.seed)
 
     # Create environment
-    env = gym.make(args.env, render_mode="human" if args.render else None)
+    if "procgen" in args.env:
+        old_env = old_gym.make(args.env)
+        env = GymV21CompatibilityV0(env=old_env)
+    else:
+        env = gymnasium.make(args.env, render_mode="human" if args.render else None)
 
     # Get observation shape and action space
     obs_shape = env.observation_space.shape
