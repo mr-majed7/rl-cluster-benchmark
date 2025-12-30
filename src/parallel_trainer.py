@@ -67,9 +67,17 @@ def worker_process(
     # Get action space
     num_actions = envs.single_action_space.n
 
-    # Use shared policy directly (already in shared memory)
-    local_policy = shared_policy
+    # Create a LOCAL copy of the policy for this worker (avoids contention on shared memory)
+    from .models import CNNActorCritic
+
+    local_policy = CNNActorCritic(observation_shape, num_actions)
     local_policy.eval()
+
+    # Copy initial parameters from shared policy
+    for local_param, shared_param in zip(
+        local_policy.parameters(), shared_policy.parameters()
+    ):
+        local_param.data.copy_(shared_param.data)
 
     def _preprocess_obs(obs: np.ndarray) -> np.ndarray:
         """Preprocess observations."""
@@ -79,13 +87,25 @@ def worker_process(
 
     print(f"Worker {worker_id} started with {num_envs_per_worker} environments")
 
+    # Initialize environments once
+    obs, _ = envs.reset()
+    obs = _preprocess_obs(obs)
+
     while not stop_event.is_set():
         try:
             # Wait for signal to collect (longer timeout for initialization)
             command = control_queue.get(timeout=30.0)
 
             if command == "collect":
-                # Policy is already shared, no need to sync
+                worker_start = time.time()
+
+                # Sync policy parameters from shared policy (fast parameter copy)
+                sync_start = time.time()
+                for local_param, shared_param in zip(
+                    local_policy.parameters(), shared_policy.parameters()
+                ):
+                    local_param.data.copy_(shared_param.data)
+                sync_time = time.time() - sync_start
 
                 # Collect rollout
                 observations = []
@@ -96,9 +116,7 @@ def worker_process(
                 log_probs = []
                 episode_infos = []
 
-                obs, _ = envs.reset()
-                obs = _preprocess_obs(obs)
-
+                rollout_start = time.time()
                 for _ in range(n_steps):
                     obs_tensor = torch.from_numpy(obs).float()
 
@@ -133,12 +151,15 @@ def worker_process(
                                     }
                                 )
 
+                rollout_time = time.time() - rollout_start
+
                 # Get final value for last observation
                 obs_tensor = torch.from_numpy(obs).float()
                 with torch.no_grad():
                     _, _, _, last_value = local_policy.get_action_and_value(obs_tensor)
 
                 # Send collected data back
+                pack_start = time.time()
                 data = {
                     "observations": np.array(observations),
                     "actions": np.array(actions),
@@ -150,8 +171,17 @@ def worker_process(
                     "episode_infos": episode_infos,
                     "worker_id": worker_id,
                 }
+                pack_time = time.time() - pack_start
 
+                send_start = time.time()
                 data_queue.put(data)
+                send_time = time.time() - send_start
+
+                worker_total = time.time() - worker_start
+                if worker_id == 0:  # Only print from worker 0 to avoid spam
+                    print(
+                        f"\n[Worker {worker_id}] Sync: {sync_time:.3f}s, Rollout: {rollout_time:.3f}s, Pack: {pack_time:.3f}s, Send: {send_time:.3f}s, Total: {worker_total:.3f}s"
+                    )
 
             elif command == "stop":
                 break
@@ -338,8 +368,10 @@ class ParallelTrainer:
         # Policy is already in shared memory, workers see updates automatically
 
         # Signal all workers to collect
+        signal_start = time.time()
         for queue in self.control_queues:
             queue.put("collect")
+        signal_time = time.time() - signal_start
 
         # Collect data from all workers
         all_observations = []
@@ -351,6 +383,7 @@ class ParallelTrainer:
         all_last_values = []
         episode_infos = []
 
+        wait_start = time.time()
         for _ in range(self.num_workers):
             data = self.data_queue.get()
 
@@ -362,6 +395,8 @@ class ParallelTrainer:
             all_log_probs.append(data["log_probs"])
             all_last_values.append(data["last_value"])
             episode_infos.extend(data["episode_infos"])
+
+        wait_time = time.time() - wait_start
 
         # Aggregate data
         aggregated_data = {
@@ -378,6 +413,10 @@ class ParallelTrainer:
 
         # Update global step
         self.global_step += self.n_steps * self.total_envs
+
+        # Debug: Print collection timing
+        if self.update_step % 10 == 0:
+            print(f"\n[Collect] Signal: {signal_time:.3f}s, Wait: {wait_time:.3f}s")
 
         # Compute episode statistics
         stats = {}
@@ -414,9 +453,12 @@ class ParallelTrainer:
                 update_start_time = time.time()
 
                 # Collect rollouts from all workers in parallel
+                collect_start = time.time()
                 rollout_data, rollout_stats = self.collect_rollouts()
+                collect_time = time.time() - collect_start
 
                 # Create buffer from aggregated data
+                buffer_start = time.time()
                 buffer = RolloutBuffer(
                     buffer_size=self.n_steps,
                     observation_shape=self.observation_shape,
@@ -442,14 +484,24 @@ class ParallelTrainer:
                     self.agent.gae_lambda,
                 )
 
+                buffer_time = time.time() - buffer_start
+
                 # Train on collected data
+                train_start = time.time()
                 train_stats = self.agent.train_step(
                     buffer, self.batch_size, self.n_epochs
                 )
+                train_time = time.time() - train_start
 
                 # Update counter
                 self.update_step += 1
                 update_time = time.time() - update_start_time
+
+                # Debug timing (only print occasionally)
+                if self.update_step % 10 == 1:
+                    print(
+                        f"\nTiming breakdown - Collect: {collect_time:.2f}s, Buffer: {buffer_time:.2f}s, Train: {train_time:.2f}s, Total: {update_time:.2f}s"
+                    )
 
                 # Logging
                 if self.update_step % self.log_interval == 0:

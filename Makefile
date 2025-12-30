@@ -1,18 +1,19 @@
-.PHONY: help install test train train-timed train-parallel train-fast evaluate compare tensorboard clean
+.PHONY: help install test train train-parallel train-timed train-parallel-timed train-fast evaluate compare tensorboard clean
 
 help:
 	@echo "RL Cluster Benchmark - Available commands:"
 	@echo ""
-	@echo "  make install         - Install dependencies"
-	@echo "  make test            - Run quick tests"
-	@echo "  make train           - Train PPO agent (sequential)"
-	@echo "  make train-timed     - Timed sequential training (1 hour)"
-	@echo "  make train-parallel  - Timed parallel training (1 hour)"
-	@echo "  make train-fast      - Quick training test"
-	@echo "  make evaluate        - Evaluate trained model"
-	@echo "  make compare         - Compare sequential vs parallel results"
-	@echo "  make tensorboard     - Launch TensorBoard"
-	@echo "  make clean           - Clean generated files"
+	@echo "  make install                - Install dependencies"
+	@echo "  make test                   - Run quick tests"
+	@echo "  make train                  - Train PPO agent (sequential, full epochs)"
+	@echo "  make train-parallel         - Train PPO agent (parallel, full epochs)"
+	@echo "  make train-timed            - Timed sequential training (1 hour)"
+	@echo "  make train-parallel-timed   - Timed parallel training (1 hour)"
+	@echo "  make train-fast             - Quick training test"
+	@echo "  make evaluate               - Evaluate trained model"
+	@echo "  make compare                - Compare sequential vs parallel results"
+	@echo "  make tensorboard            - Launch TensorBoard"
+	@echo "  make clean                  - Clean generated files"
 	@echo ""
 
 install:
@@ -24,10 +25,13 @@ test:
 train:
 	python train_ppo_sequential.py --config config/ppo_sequential.yaml
 
+train-parallel:
+	python train_ppo_parallel.py --config config/ppo_parallel.yaml
+
 train-timed:
 	python train_timed.py --duration 1.0 --output-dir ./benchmarks/sequential_1h --num-envs 32
 
-train-parallel:
+train-parallel-timed:
 	python train_parallel_timed.py --duration 1.0 --output-dir ./benchmarks/parallel_1h --num-workers 4 --num-envs-per-worker 8
 
 train-fast:
