@@ -1,0 +1,21 @@
+env:
+  name: procgen-coinrun-v0
+
+training:
+  num_envs: 112              # 4x increase from 28 (close to 28 threads)
+  n_steps: 256               # Double for better efficiency
+  total_timesteps: 50000000  # Increased for longer training if needed
+  batch_size: 2048           # Double for better GPU utilization
+  n_epochs: 4
+  learning_rate: 0.0003
+  gamma: 0.999
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  log_interval: 1
+  save_interval: 50
+  device: cpu
+  num_threads: 28            # All 28 threads available
+  seed: null

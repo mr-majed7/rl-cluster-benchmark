@@ -1,0 +1,24 @@
+env:
+  name: procgen-coinrun-v0
+
+parallel:
+  num_workers: 7             # 7 workers (fits nicely with 28 threads)
+  num_envs_per_worker: 16    # 16 envs per worker (total = 7 × 16 = 112)
+
+training:
+  n_steps: 256               # Match sequential for fair comparison
+  total_timesteps: 50000000  # Increased for longer training if needed
+  batch_size: 4096           # Larger batch for parallel (all workers combined)
+  n_epochs: 4
+  learning_rate: 0.0003
+  gamma: 0.999
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  log_interval: 1
+  save_interval: 50
+  device: cpu
+  num_threads: 28            # All threads available
+  seed: null
