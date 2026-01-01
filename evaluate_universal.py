@@ -163,6 +163,7 @@ def main():
             observation_shape=observation_shape,
             num_actions=num_actions,
             device=args.device,
+            num_threads=4,  # Use only 4 threads for evaluation (inference only)
         )
 
     # Load checkpoint
