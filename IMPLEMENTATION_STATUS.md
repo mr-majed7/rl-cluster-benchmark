@@ -13,10 +13,10 @@
 ### 2. IMPALA (Importance Weighted Actor-Learner Architecture)
 
 - ✅ Sequential implementation with V-trace off-policy correction
+- ✅ **Parallel implementation with actor-learner architecture**
 - ✅ CPU-optimized training
 - ✅ Timed benchmarking scripts
-- ✅ Configuration file
-- ⏳ Parallel implementation (pending)
+- ✅ Configuration files
 
 ### 3. CPU Optimization
 
@@ -81,6 +81,8 @@ make train-parallel-timed   # Timed parallel PPO (1 hour, has issues)
 # IMPALA
 make train-impala           # Sequential IMPALA
 make train-impala-timed     # Timed sequential IMPALA (30 min)
+make train-impala-parallel  # Parallel IMPALA - NEW!
+make train-impala-parallel-timed # Timed parallel IMPALA (30 min) - NEW!
 
 # Evaluation and comparison
 make evaluate               # Evaluate trained model
@@ -125,9 +127,9 @@ python train_impala_sequential_timed.py --duration 0.5 --output-dir ./benchmarks
 
 ### To Implement
 
-1. **Parallel IMPALA** - Using actor-learner architecture
-2. **A2C/A3C** - Advantage Actor-Critic (sequential and parallel)
-3. **Fix Parallel PPO** - Redesign to eliminate shared memory bottleneck
+1. **A2C/A3C** - Advantage Actor-Critic (sequential and parallel)
+2. **Fix Parallel PPO** - Redesign to eliminate shared memory bottleneck
+3. **Comparison tools** - Automated comparison between algorithms
 
 ### Comparison Tasks
 
@@ -149,6 +151,9 @@ Once parallel IMPALA is implemented, you can compare:
 ### IMPALA
 
 - `config/impala_sequential.yaml` - Standard sequential config
+- `config/impala_parallel.yaml` - Standard parallel config
+- `config/impala_sequential_ryzen7.yaml` - Ryzen 7 sequential config
+- `config/impala_parallel_ryzen7.yaml` - Ryzen 7 parallel config
 
 ## 🎯 Quick Test
 
@@ -179,7 +184,7 @@ python evaluate.py --checkpoint ./benchmarks/impala_seq_30min/checkpoints/impala
 | Algorithm | Sequential | Parallel | CPU Optimized | Tested |
 |-----------|-----------|----------|---------------|--------|
 | PPO       | ✅        | ⚠️       | ✅            | ✅     |
-| IMPALA    | ✅        | ❌       | ✅            | ✅     |
+| IMPALA    | ✅        | ✅       | ✅            | ✅     |
 | A2C/A3C   | ❌        | ❌       | ❌            | ❌     |
 
 Legend:

@@ -1,0 +1,32 @@
+env:
+  name: "procgen-coinrun-v0"
+  seed: 42
+
+parallel:
+  num_actors: 7              # 7 actors for 28 threads (4 threads per actor)
+  num_envs_per_actor: 16     # 16 envs per actor (total = 7 × 16 = 112)
+  policy_update_frequency: 1  # Send policy to actors every update
+
+training:
+  n_steps: 128               # Rollout length per actor
+  total_timesteps: 25_000_000
+  learning_rate: 0.0003      # Increased from 0.0001 for faster learning
+  gamma: 0.999               # Discount factor
+
+impala:
+  vtrace_clip_rho_threshold: 1.0
+  vtrace_clip_pg_rho_threshold: 1.0
+  entropy_coef: 0.01
+  value_coef: 0.5
+  max_grad_norm: 40.0
+
+logging:
+  log_interval: 10
+  save_interval: 100
+  checkpoint_dir: "./checkpoints/impala_parallel_highend"
+  log_dir: "./logs"
+
+hardware:
+  device: "cpu"
+  num_threads: 28            # All 28 threads (auto-divided among actors + learner)
+

@@ -698,12 +698,14 @@ cat ./benchmarks/impala_par_30min/training_summary.json
 ### IMPALA Sequential vs Parallel Comparison
 
 **When to use Sequential:**
+
 - Single machine with limited cores (<8 cores)
 - Debugging and development
 - Memory-constrained systems (<8GB RAM)
 - Simple baseline experiments
 
 **When to use Parallel:**
+
 - Multi-core CPU (8+ cores)
 - Production training runs
 - Need maximum throughput
@@ -720,6 +722,7 @@ cat ./benchmarks/impala_par_30min/training_summary.json
 | Complexity | Simple | Moderate | - |
 
 **Parallel IMPALA Benefits:**
+
 - ✅ **30-50% faster** than sequential
 - ✅ Proper actor-learner architecture
 - ✅ Better CPU utilization
@@ -892,7 +895,7 @@ python -c "import gym; env = gym.make('procgen-coinrun-v0'); print('Env OK')"
 
 **Issue: Parallel PPO Slower Than Sequential**
 
-**Current Status:** This is a known issue with the current parallel PPO implementation due to shared memory contention. 
+**Current Status:** This is a known issue with the current parallel PPO implementation due to shared memory contention.
 
 **Recommendation:** Use **Parallel IMPALA** instead! IMPALA was designed from the ground up for distributed training and performs excellently with the actor-learner architecture. Parallel IMPALA is typically **30-50% faster** than sequential.
 
@@ -1023,11 +1026,13 @@ nvidia-smi  # If using GPU
 ### Recommended Workflow
 
 #### For Quick Testing (15 minutes)
+
 1. **Train IMPALA Parallel**: 6 min (fastest, best throughput)
 2. **Train PPO Sequential**: 6 min (stable baseline)
 3. **Evaluate both**: 3 min total
 
 #### For Algorithm Comparison (1.5 hours)
+
 1. **Train PPO Sequential**: 30 min
 2. **Train IMPALA Sequential**: 30 min
 3. **Train IMPALA Parallel**: 30 min
@@ -1035,6 +1040,7 @@ nvidia-smi  # If using GPU
 5. **Analysis**: Compare results
 
 #### For Production Training (Pick One)
+
 - **Best Throughput**: Parallel IMPALA (recommended for clusters)
 - **Most Stable**: Sequential PPO (recommended for single machines)
 - **Best Balance**: Sequential IMPALA (good middle ground)

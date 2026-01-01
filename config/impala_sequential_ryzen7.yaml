@@ -6,7 +6,7 @@ training:
   num_envs: 48                # 48 environments (balanced for memory)
   n_steps: 128                # Standard for IMPALA
   total_timesteps: 25_000_000
-  learning_rate: 0.0001
+  learning_rate: 0.0003       # Increased from 0.0001 for better learning
   gamma: 0.999
 
 impala:
