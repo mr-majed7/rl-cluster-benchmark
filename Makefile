@@ -1,4 +1,4 @@
-.PHONY: help install test train train-parallel train-timed train-parallel-timed train-impala train-impala-timed train-fast evaluate compare tensorboard clean
+.PHONY: help install test train train-parallel train-timed train-parallel-timed train-impala train-impala-timed train-impala-parallel train-impala-parallel-timed train-fast evaluate evaluate-ppo evaluate-impala compare tensorboard clean
 
 help:
 	@echo "RL Cluster Benchmark - Available commands:"
@@ -12,12 +12,16 @@ help:
 	@echo "IMPALA Training:"
 	@echo "  make train-impala           - Train IMPALA agent (sequential)"
 	@echo "  make train-impala-timed     - Timed IMPALA sequential (30 min)"
+	@echo "  make train-impala-parallel  - Train IMPALA agent (parallel)"
+	@echo "  make train-impala-parallel-timed - Timed IMPALA parallel (30 min)"
 	@echo ""
 	@echo "General:"
 	@echo "  make install                - Install dependencies"
 	@echo "  make test                   - Run quick tests"
 	@echo "  make train-fast             - Quick training test"
-	@echo "  make evaluate               - Evaluate trained model"
+	@echo "  make evaluate               - Evaluate PPO model (legacy)"
+	@echo "  make evaluate-ppo           - Evaluate PPO model"
+	@echo "  make evaluate-impala        - Evaluate IMPALA model"
 	@echo "  make compare                - Compare sequential vs parallel results"
 	@echo "  make tensorboard            - Launch TensorBoard"
 	@echo "  make clean                  - Clean generated files"
@@ -47,6 +51,12 @@ train-impala:
 train-impala-timed:
 	python train_impala_sequential_timed.py --duration 0.5 --output-dir ./benchmarks/impala_sequential_30min
 
+train-impala-parallel:
+	python train_impala_parallel.py --config config/impala_parallel.yaml
+
+train-impala-parallel-timed:
+	python train_impala_parallel_timed.py --duration 0.5 --output-dir ./benchmarks/impala_parallel_30min
+
 train-fast:
 	python train_ppo_sequential.py --total-timesteps 500000 --num-envs 16 --save-interval 10
 
@@ -57,6 +67,24 @@ evaluate:
 		python evaluate.py --checkpoint benchmarks/sequential_1h/checkpoints/ppo_sequential_final.pt --num-episodes 50; \
 	else \
 		echo "No checkpoint found. Train a model first with 'make train' or 'make train-timed'"; \
+	fi
+
+evaluate-ppo:
+	@if [ -f "checkpoints/ppo_sequential/ppo_sequential_final.pt" ]; then \
+		python evaluate_universal.py --algorithm ppo --checkpoint checkpoints/ppo_sequential/ppo_sequential_final.pt --env procgen-coinrun-v0 --num-episodes 100 --deterministic; \
+	elif [ -f "benchmarks/sequential_1h/checkpoints/ppo_sequential_final.pt" ]; then \
+		python evaluate_universal.py --algorithm ppo --checkpoint benchmarks/sequential_1h/checkpoints/ppo_sequential_final.pt --env procgen-coinrun-v0 --num-episodes 100 --deterministic; \
+	else \
+		echo "No PPO model found. Train one first with 'make train' or 'make train-timed'"; \
+	fi
+
+evaluate-impala:
+	@if [ -f "checkpoints/impala_sequential/impala_sequential_final.pt" ]; then \
+		python evaluate_universal.py --algorithm impala --checkpoint checkpoints/impala_sequential/impala_sequential_final.pt --env procgen-coinrun-v0 --num-episodes 100 --deterministic; \
+	elif [ -f "benchmarks/impala_seq_30min/checkpoints/impala_sequential_final.pt" ]; then \
+		python evaluate_universal.py --algorithm impala --checkpoint benchmarks/impala_seq_30min/checkpoints/impala_sequential_final.pt --env procgen-coinrun-v0 --num-episodes 100 --deterministic; \
+	else \
+		echo "No IMPALA model found. Train one first with 'make train-impala' or 'make train-impala-timed'"; \
 	fi
 
 compare:

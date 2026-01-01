@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate a trained PPO agent on Procgen environments."""
+"""Evaluate trained RL agents (PPO, IMPALA) on Procgen environments."""
 import argparse
 
 import gym as old_gym
@@ -15,21 +15,29 @@ try:
 except ImportError:
     print("Warning: procgen not installed")
 
+from src.impala import IMPALA
 from src.ppo import PPO
 
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="Evaluate PPO agent on Procgen")
+    parser = argparse.ArgumentParser(description="Evaluate RL agent on Procgen")
 
     parser.add_argument(
         "--checkpoint", type=str, required=True, help="Path to model checkpoint"
     )
     parser.add_argument(
+        "--algorithm",
+        type=str,
+        required=True,
+        choices=["ppo", "impala"],
+        help="Algorithm type (ppo or impala)",
+    )
+    parser.add_argument(
         "--env",
         type=str,
-        default="procgen:procgen-coinrun-v0",
-        help="Environment name (use procgen:procgen-<game>-v0 format)",
+        default="procgen-coinrun-v0",
+        help="Environment name",
     )
     parser.add_argument(
         "--num-episodes", type=int, default=100, help="Number of episodes to evaluate"
@@ -56,11 +64,14 @@ def preprocess_obs(obs: np.ndarray) -> np.ndarray:
     return np.expand_dims(obs, axis=0)  # Add batch dimension
 
 
-def evaluate(agent: PPO, env, num_episodes: int, deterministic: bool = False):
+def evaluate(
+    agent, algorithm: str, env, num_episodes: int, deterministic: bool = False
+):
     """Evaluate agent for multiple episodes.
 
     Args:
-        agent: PPO agent to evaluate
+        agent: RL agent to evaluate (PPO or IMPALA)
+        algorithm: Algorithm type ('ppo' or 'impala')
         env: Environment to evaluate on
         num_episodes: Number of episodes
         deterministic: Use deterministic policy
@@ -80,8 +91,15 @@ def evaluate(agent: PPO, env, num_episodes: int, deterministic: bool = False):
         done = False
 
         while not done:
-            action, _, _ = agent.predict(obs, deterministic=deterministic)
-            obs, reward, terminated, truncated, _ = env.step(action.item())
+            # Get action based on algorithm
+            if algorithm == "ppo":
+                action, _, _ = agent.predict(obs, deterministic=deterministic)
+                action = action.item()
+            else:  # impala
+                action, _, _ = agent.get_action(obs, deterministic=deterministic)
+                action = action.item()
+
+            obs, reward, terminated, truncated, _ = env.step(action)
             obs = preprocess_obs(obs)
 
             episode_reward += reward
@@ -122,28 +140,41 @@ def main():
     observation_shape = (obs_shape[2], obs_shape[0], obs_shape[1])  # (C, H, W)
     num_actions = env.action_space.n
 
-    print(f"\nEnvironment: {args.env}")
+    print(f"\n{'='*60}")
+    print(f"Evaluating {args.algorithm.upper()} Agent")
+    print(f"{'='*60}")
+    print(f"Environment: {args.env}")
     print(f"Observation shape: {observation_shape}")
     print(f"Number of actions: {num_actions}")
     print(f"Device: {args.device}")
     print(f"Checkpoint: {args.checkpoint}")
+    print(f"Algorithm: {args.algorithm.upper()}")
     print("-" * 60)
 
-    # Initialize agent
-    agent = PPO(
-        observation_shape=observation_shape, num_actions=num_actions, device=args.device
-    )
+    # Initialize agent based on algorithm
+    if args.algorithm == "ppo":
+        agent = PPO(
+            observation_shape=observation_shape,
+            num_actions=num_actions,
+            device=args.device,
+        )
+    else:  # impala
+        agent = IMPALA(
+            observation_shape=observation_shape,
+            num_actions=num_actions,
+            device=args.device,
+        )
 
     # Load checkpoint
     agent.load(args.checkpoint)
-    print(f"Loaded checkpoint from: {args.checkpoint}\n")
+    print(f"✓ Loaded checkpoint from: {args.checkpoint}\n")
 
     # Evaluate
-    stats = evaluate(agent, env, args.num_episodes, args.deterministic)
+    stats = evaluate(agent, args.algorithm, env, args.num_episodes, args.deterministic)
 
     # Print results
     print("\n" + "=" * 60)
-    print("Evaluation Results")
+    print(f"{args.algorithm.upper()} Evaluation Results")
     print("=" * 60)
     print(f"Episodes: {args.num_episodes}")
     print(f"Mean Reward: {stats['mean_reward']:.2f} ± {stats['std_reward']:.2f}")

@@ -1,0 +1,27 @@
+env:
+  name: "procgen-coinrun-v0"
+  seed: 42
+
+training:
+  num_envs: 64                # 64 environments for good parallelization
+  n_steps: 256                # Standard rollout length
+  total_timesteps: 25_000_000
+  batch_size: 2048            # num_envs * n_steps / 8
+  n_epochs: 4
+  learning_rate: 0.0003
+  gamma: 0.999
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  log_interval: 1
+  save_interval: 100
+  device: cpu
+  num_threads: 16             # All 16 threads
+  seed: null
+
+logging:
+  checkpoint_dir: "./checkpoints/ppo_sequential_ryzen7"
+  log_dir: "./logs"
+

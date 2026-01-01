@@ -1,6 +1,8 @@
 # RL Cluster Benchmark
 
-Benchmarking reinforcement learning algorithms (PPO, A2C/A3C, IMPALA) on Procgen environments with **CPU-optimized** sequential and distributed training for cluster computing.
+Benchmarking reinforcement learning algorithms (PPO, IMPALA) on Procgen environments with **CPU-optimized** sequential and distributed training for cluster computing.
+
+> **📖 NEW: [Complete Training & Evaluation Guide](COMPLETE_TRAINING_GUIDE.md)** - Comprehensive guide for training and evaluating PPO & IMPALA with detailed metrics explanations.
 
 ## Overview
 
